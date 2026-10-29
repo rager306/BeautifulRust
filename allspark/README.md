@@ -155,8 +155,12 @@ create a second source of truth for skill text.
 `allspark/sync` and opens a pull request instead of pushing to `main`; a green PR is the
 review gate. Merge the PR with a merge commit, not a squash: the fork tag points at the
 branch commit. GitHub disables workflows on forks by default, so enable Actions in the
-fork's settings once, and allow Actions to create pull requests (Settings > Actions >
-General).
+fork's settings once.
+
+The workflow uses `github.token` by default. If the repo does not allow Actions to create
+pull requests (Settings > Actions > General), add a fine-grained `ALLSPARK_SYNC_TOKEN`
+secret with `contents: write` and `pull-requests: write`; otherwise the branch is still
+pushed and the job prints a compare link instead of failing.
 
 ## Layout
 

@@ -40,7 +40,11 @@ jobs:
         run: python3 allspark/sync.py sync --apply --full --branch allspark/sync --tag --push
       - name: Open or update the pull request
         env:
-          GH_TOKEN: ${{ github.token }}
+          # A fine-grained PAT with contents:write and pull-requests:write makes
+          # this fully automatic. Without it, github.token is used; if the repo
+          # forbids Actions from creating pull requests, the branch is still
+          # pushed and the notice below prints a compare link.
+          GH_TOKEN: ${{ secrets.ALLSPARK_SYNC_TOKEN || github.token }}
         run: |
           if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
             echo "no sync branch was created; upstream was already current"
@@ -51,11 +55,12 @@ jobs:
             exit 0
           fi
           if gh pr view allspark/sync --json number >/dev/null 2>&1; then
-            gh pr comment allspark/sync --body "Rebuilt from the latest upstream main."
-          else
-            gh pr create \
+            gh pr comment allspark/sync --body "Rebuilt from the latest upstream main." \
+              || echo "::notice::Could not comment on the pull request."
+          elif ! gh pr create \
               --base main \
               --head allspark/sync \
               --title "allspark: sync upstream" \
-              --body "Automated sync from morganlinton/BeautifulRust. The upstream validator, the allspark compatibility checker, the unit tests, the example compiler, and the lint proof all passed before this branch was pushed. Merge with a merge commit, not squash: the fork tag points at the branch commit."
+              --body "Automated sync from morganlinton/BeautifulRust. The upstream validator, the allspark compatibility checker, the unit tests, the example compiler, and the lint proof all passed before this branch was pushed. Merge with a merge commit, not squash: the fork tag points at the branch commit."; then
+            echo "::notice::Could not create a pull request with the current token. Open one: ${{ github.server_url }}/${{ github.repository }}/compare/main...allspark/sync?expand=1"
           fi
