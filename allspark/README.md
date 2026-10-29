@@ -94,8 +94,10 @@ allspark package install https://github.com/rager306/BeautifulRust
 ```
 
 The canonical package path is
-`$ALLSPARK_HOME/.prime/agent/git/github.com/rager306/BeautifulRust`. If a package was
-already installed into the nested home, remove that duplicate:
+`$ALLSPARK_HOME/.prime/agent/git/github.com/rager306/BeautifulRust`. `allspark/check.py`
+warns when it is run from a nested `.allspark-home`, so the mistake is visible in the
+install check. If a package was already installed into the nested home, remove that
+duplicate:
 
 ```bash
 ALLSPARK_HOME=/root/.allspark-home/.allspark-home \

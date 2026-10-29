@@ -210,6 +210,15 @@ class AllsparkCheckTests(unittest.TestCase):
             _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("must match Python import name" in message for message in messages(problems, "warning")))
 
+    def test_nested_allspark_home_warns(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / ".allspark-home" / ".allspark-home"
+            build_repo(root)
+            _, _, problems = self.checker.check_repo(root)
+            self.assertTrue(
+                any("nested .allspark-home" in message for message in messages(problems, "warning"))
+            )
+
     def test_python_skill_invalid_toml_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             root = build_repo(temp)

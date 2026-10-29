@@ -536,6 +536,21 @@ def _check_python_skill(
             )
 
 
+def _check_install_path(root: Path, problems: List[Problem]) -> None:
+    parts = root.parts
+    for index, part in enumerate(parts):
+        if part == ".allspark-home" and index + 1 < len(parts) and parts[index + 1] == ".allspark-home":
+            problems.append(
+                Problem(
+                    ".",
+                    1,
+                    "warning",
+                    "package is installed under a nested .allspark-home; set ALLSPARK_HOME to the outer home",
+                )
+            )
+            return
+
+
 def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
     root = root.resolve()
     problems: List[Problem] = []
@@ -590,6 +605,7 @@ def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
 
     _check_package_manifest(root, problems)
     _check_upstream_metadata(root, problems)
+    _check_install_path(root, problems)
     return sorted(names), sorted(python_skills), problems
 
 
