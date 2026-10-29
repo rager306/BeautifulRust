@@ -179,10 +179,10 @@ create a second source of truth for skill text.
 ## GitHub Actions
 
 `.github/workflows/allspark-check.yml` runs on every push and pull request that touches
-`allspark/`, `skills/rust-review/`, `tests/`, or `scripts/check-skill.py`. It runs the unit
-tests, the allspark checker, the upstream validator, and an editable install/import smoke
-test for the Python skill. This is the job that catches an adapter regression before the
-next upstream release.
+`allspark/`, `skills/`, `tests/`, or `scripts/check-skill.py`. It runs the unit tests, the
+allspark checker, the upstream validator, and an editable install/import smoke test for
+the Python skill. This is the job that catches an adapter regression before the next
+upstream release.
 
 `.github/workflows/allspark-sync.yml` runs the same sync script daily and on demand. It
 creates `allspark/sync` and opens a pull request instead of pushing to `main`; a green PR
