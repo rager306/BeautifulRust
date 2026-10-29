@@ -1,0 +1,16 @@
+[project]
+name = "rust-review"
+version = "0.1.0"
+description = "Inventory Rust code for the rust-review Agent Skill."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+rust_review = "rlm.skill:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rust_review"]

@@ -3,9 +3,9 @@
 
 allspark discovers a capability package by its ``skills/<name>/SKILL.md`` files.
 It follows the Agent Skills standard, so the upstream files are already close;
-this checker covers the rules allspark enforces and the Claude-only constructs
-that allspark ignores. It is deliberately stdlib-only so CI can run it without
-installing anything:
+this checker covers the rules allspark enforces, the Python-backed skill
+contract, and the Claude-only constructs that allspark ignores. It is
+deliberately stdlib-only so CI can run it without installing anything:
 
     python3 allspark/check.py
     python3 allspark/check.py --json
@@ -20,6 +20,11 @@ import json
 import re
 import subprocess
 import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    tomllib = None
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -311,29 +316,7 @@ def _check_skill(skill_md: Path, root: Path, problems: List[Problem]) -> Optiona
                 continue
             _check_text(reference, reference_text, problems)
 
-    pyproject = skill_md.parent / "pyproject.toml"
-    if pyproject.exists():
-        import_name = name.replace("-", "_")
-        package_init = skill_md.parent / "src" / import_name / "__init__.py"
-        if package_init.is_file():
-            problems.append(
-                Problem(
-                    str(relative),
-                    1,
-                    "error",
-                    "pyproject.toml makes allspark install this as a Python skill; adapt the fork deliberately",
-                )
-            )
-        else:
-            problems.append(
-                Problem(
-                    str(relative),
-                    1,
-                    "warning",
-                    "pyproject.toml without src/%s/__init__.py: allspark warns and loads it as markdown"
-                    % import_name,
-                )
-            )
+    _check_python_skill(skill_md, name, relative, problems)
     return name
 
 
@@ -425,24 +408,147 @@ def _check_upstream_metadata(root: Path, problems: List[Problem]) -> None:
             )
 
 
-def check_repo(root: Path) -> Tuple[List[str], List[Problem]]:
+def _check_python_skill(
+    skill_md: Path, name: str, relative: Path, problems: List[Problem]
+) -> None:
+    """Validate the Python-backed skill contract allspark documents.
+
+    allspark marks a skill as Python-backed by the presence of pyproject.toml,
+    then requires src/<name_with_underscores>/__init__.py. A broken package
+    silently degrades to markdown with a warning, so this checker makes the
+    contract explicit.
+    """
+    pyproject = skill_md.parent / "pyproject.toml"
+    if not pyproject.exists():
+        return
+    import_name = name.replace("-", "_")
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", import_name):
+        problems.append(
+            Problem(
+                str(relative),
+                1,
+                "error",
+                'Python skill import name "%s" is not a valid ASCII identifier' % import_name,
+            )
+        )
+        return
+    package_init = skill_md.parent / "src" / import_name / "__init__.py"
+    if not package_init.is_file():
+        problems.append(
+            Problem(
+                str(relative),
+                1,
+                "error",
+                "Python skill is missing src/%s/__init__.py; allspark falls back to markdown"
+                % import_name,
+            )
+        )
+        return
+
+    try:
+        text = pyproject.read_text(encoding="utf-8")
+    except OSError as error:
+        problems.append(Problem(str(relative.parent / "pyproject.toml"), 1, "error", str(error)))
+        return
+
+    if tomllib is None:
+        if "prime-agent-runtime" in text:
+            problems.append(
+                Problem(
+                    str(relative),
+                    1,
+                    "error",
+                    "prime-agent-runtime is bundled with allspark; do not declare it as a dependency",
+                )
+            )
+        return
+
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        problems.append(Problem(str(relative), 1, "error", "pyproject.toml is not valid TOML: %s" % error))
+        return
+
+    project = data.get("project")
+    if not isinstance(project, dict):
+        problems.append(Problem(str(relative), 1, "warning", "pyproject.toml has no [project] table"))
+        return
+    if not project.get("name"):
+        problems.append(Problem(str(relative), 1, "warning", "[project] has no name"))
+    dependencies = project.get("dependencies")
+    if isinstance(dependencies, list):
+        for dependency in dependencies:
+            if not isinstance(dependency, str):
+                continue
+            package = dependency.split(";", 1)[0].strip().split("[", 1)[0].strip().lower()
+            if package.replace("_", "-") == "prime-agent-runtime":
+                problems.append(
+                    Problem(
+                        str(relative),
+                        1,
+                        "error",
+                        "prime-agent-runtime is bundled with allspark; do not declare it as a dependency",
+                    )
+                )
+    scripts = project.get("scripts")
+    if isinstance(scripts, dict):
+        for script_name in scripts:
+            if script_name != import_name:
+                problems.append(
+                    Problem(
+                        str(relative),
+                        1,
+                        "warning",
+                        "CLI script %r must match Python import name %r" % (script_name, import_name),
+                    )
+                )
+    wheel: Dict[str, Any] = {}
+    tool = data.get("tool")
+    if isinstance(tool, dict):
+        hatch = tool.get("hatch")
+        if isinstance(hatch, dict):
+            build = hatch.get("build")
+            if isinstance(build, dict):
+                targets = build.get("targets")
+                if isinstance(targets, dict):
+                    candidate = targets.get("wheel")
+                    if isinstance(candidate, dict):
+                        wheel = candidate
+    packages = wheel.get("packages")
+    if isinstance(packages, list) and packages:
+        expected = "src/" + import_name
+        if not any(str(package).rstrip("/") == expected for package in packages):
+            problems.append(
+                Problem(
+                    str(relative),
+                    1,
+                    "warning",
+                    "hatch wheel packages should include %s" % expected,
+                )
+            )
+
+
+def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
     root = root.resolve()
     problems: List[Problem] = []
     skills_dir = root / "skills"
     if not skills_dir.is_dir():
         problems.append(Problem("skills", 1, "error", "missing skills/ directory"))
-        return [], problems
+        return [], [], problems
 
     skill_files = discover_skill_files(root)
     if not skill_files:
         problems.append(Problem("skills", 1, "error", "no SKILL.md found under skills/"))
-        return [], problems
+        return [], [], problems
 
     names: List[str] = []
+    python_skills: List[str] = []
     for skill_md in skill_files:
         name = _check_skill(skill_md, root, problems)
         if name:
             names.append(name)
+            if (skill_md.parent / "pyproject.toml").exists():
+                python_skills.append(name)
 
     for name in CORE_SKILLS:
         if name not in names:
@@ -476,7 +582,7 @@ def check_repo(root: Path) -> Tuple[List[str], List[Problem]]:
 
     _check_package_manifest(root, problems)
     _check_upstream_metadata(root, problems)
-    return sorted(names), problems
+    return sorted(names), sorted(python_skills), problems
 
 
 def format_problem(problem: Problem) -> str:
@@ -501,13 +607,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print("1 error, 0 warnings")
         return 1
 
-    names, problems = check_repo(root)
+    names, python_skills, problems = check_repo(root)
     errors = sum(1 for problem in problems if problem.level == "error")
     warnings = sum(1 for problem in problems if problem.level == "warning")
     if args.as_json:
         print(json.dumps({
             "ok": errors == 0,
             "skills": names,
+            "python_skills": python_skills,
             "error_count": errors,
             "warning_count": warnings,
             "problems": [asdict(problem) for problem in problems],
@@ -516,6 +623,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for problem in problems:
             print(format_problem(problem))
         print("skills: %s" % (", ".join(names) if names else "(none)"))
+        print("python skills: %s" % (", ".join(python_skills) if python_skills else "(none)"))
         print("%d %s, %d %s" % (errors, "error" if errors == 1 else "errors",
                                 warnings, "warning" if warnings == 1 else "warnings"))
     return 1 if errors else 0

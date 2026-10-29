@@ -43,6 +43,17 @@ cargo clippy --all-targets --all-features -- -W clippy::pedantic
 cargo test
 ```
 
+In allspark, the `rust_review` Python skill gathers the mechanical inventory before you
+read:
+
+```python
+print(await rust_review("src", include_tests=False))
+```
+
+It reports files, public API items, panic sites, unsafe blocks, clones, and test markers
+with `file:line` references. Treat it as a map, not a verdict; keep the judgment and the
+rule citations in the report.
+
 Don't paste raw clippy output. Group repeated warnings into one finding, and skip pedantic
 lints that don't matter for this code. If the tools aren't available, say so in the report
 and review by reading.

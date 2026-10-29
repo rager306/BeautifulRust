@@ -40,6 +40,11 @@ What does **not** carry over, and does not need to:
 The only runtime surface is `skills/*/SKILL.md` plus the files under each skill's
 `references/` and `assets/`. Everything the checker reads is exactly that surface.
 
+`rust-review` is also a **Python-backed skill**: `skills/rust-review/pyproject.toml` and
+`skills/rust-review/src/rust_review/__init__.py` make allspark install the package into
+the kernel and expose `rust_review`. The markdown skill stays the instruction source;
+the Python call is an extra, machine-checkable step.
+
 ## Install for allspark
 
 User scope (the usual choice):
@@ -85,8 +90,10 @@ not match the `0.10.2` loader; the package install path above is the supported o
 - `SKILL.md` is below allspark's 256 KiB context-file cap;
 - loaded content contains no Claude-only construct (`${CLAUDE_PLUGIN_ROOT}`,
   `.claude-plugin`, `claude plugin`, `/plugin install`, `claude --plugin-dir`);
-- a `pyproject.toml` is not present unless the fork deliberately turns the skill into an
-  allspark Python skill;
+- a Python-backed skill (`pyproject.toml`) satisfies allspark's contract:
+  `src/<name_with_underscores>/__init__.py` exists, the CLI script name matches the import
+  name, the hatch wheel lists `src/<name_with_underscores>`, and
+  `prime-agent-runtime` is not a dependency;
 - `package.json`, if upstream adds one, does not override `pi.skills` away from `skills/`;
 - the three core skills (`rust-best-practices`, `rust-review`, `rust-port`) are present;
 - discovery matches allspark's stopping rule: a directory with `SKILL.md` is a skill root,
@@ -100,6 +107,26 @@ python3 allspark/check.py --json
 ```
 
 Exit code 1 means a release needs a deliberate adaptation before the fork tag.
+
+## Python-backed rust-review
+
+allspark detects a Python skill by `pyproject.toml` at the skill root and
+`src/<name_with_underscores>/__init__.py`. `rust-review` meets that contract, so the kernel
+exposes `rust_review`:
+
+```python
+print(await rust_review("src", include_tests=False))
+```
+
+The call returns a markdown inventory: files, public API items, `unwrap()`/`expect()`,
+`panic!`, unsafe blocks, `// SAFETY:` comments, test markers, clones, and
+`Rc`/`Arc<RefCell<..>>`, each with `file:line` references. It is evidence, not a verdict;
+the agent still reads the code and writes the prioritized report. `SKILL.md` documents the
+call under "Run the tools first".
+
+The package has no third-party dependencies. `uv pip install --editable` with hatchling
+build isolation was tested in a clean venv, and the upstream validators do not reject the
+extra files.
 
 ## Sync with upstream
 
@@ -138,7 +165,7 @@ The fork never pushes to `upstream`; its push URL is `no_push`.
 | A core skill is renamed or removed | **No** | The checker fails on the missing core skill; a human decides the replacement. |
 | Frontmatter rules change, or a new required field appears | **No** | The checker fails; update `allspark/check.py`. |
 | A Claude-only construct enters a loaded skill | **No** | The checker fails; either rewrite the text or record why it is safe. |
-| A `pyproject.toml` turns a skill into a Python skill | **No** | allspark would install a package into the kernel; that is a deliberate fork decision. |
+| A `pyproject.toml` turns a skill into a Python skill | **Yes, with validation** | The checker verifies the package layout, script name, wheel entry, and forbidden runtime dependency. |
 | The repo moves `skills/` or changes its layout | **No** | Discovery finds no skills; the checker fails. |
 | License or source-attribution changes | **No** | The checker does not judge policy; review the diff. |
 | A merge conflict in a file the fork also edits | **No** | `sync` aborts and lists the paths. The fork edits no upstream skill or documentation file; the only upstream edit is three lines in `.gitignore` for Python caches. |
@@ -171,4 +198,8 @@ allspark/
 ├── check.py          allspark compatibility validator
 ├── sync.py           fetch → merge → validate → tag
 └── upstream.json     last synced upstream commit and check result
+
+skills/rust-review/
+├── pyproject.toml    Python-backed skill manifest
+└── src/rust_review/__init__.py  the rust_review() inventory call
 ```

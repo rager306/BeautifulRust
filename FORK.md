@@ -8,9 +8,11 @@ The fork adds one thing: an adaptation layer in [`allspark/`](allspark/README.md
 installs and validates the same skills in **allspark** (`/root/prime-agent`, the fork of
 `PrimeIntellect-ai/prime-agent`) and syncs new upstream releases.
 
-Nothing under `skills/` is rewritten. Both projects implement the Agent Skills standard, so
-allspark's package resolver reads `skills/*/SKILL.md` directly. The fork keeps upstream
-files untouched, which is what makes an upstream release a clean merge.
+Both projects implement the Agent Skills standard, so allspark's package resolver reads
+`skills/*/SKILL.md` directly. The fork also makes `rust-review` a Python-backed skill:
+`skills/rust-review/pyproject.toml` and `src/rust_review/` expose an inventory call in
+allspark's kernel. Upstream skill text is otherwise kept intact, which is what makes an
+upstream release a clean merge.
 
 ## Remotes
 

@@ -13,6 +13,24 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "allspark" / "check.py"
 CORE = ("rust-best-practices", "rust-review", "rust-port")
 
+VALID_PYPROJECT = """\
+[project]
+name = "rust-review"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+rust_review = "rlm.skill:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rust_review"]
+"""
+
 
 def load_checker():
     spec = importlib.util.spec_from_file_location("allspark_check", SCRIPT)
@@ -50,6 +68,14 @@ def build_repo(root, names=CORE):
     return root
 
 
+def add_python_package(root, name="rust-review", pyproject=VALID_PYPROJECT):
+    directory = Path(root) / "skills" / name
+    write(directory / "pyproject.toml", pyproject)
+    import_name = name.replace("-", "_")
+    write(directory / "src" / import_name / "__init__.py", "async def run():\n    return 'ok'\n")
+    return directory
+
+
 def messages(problems, level=None):
     return [
         problem.message
@@ -64,8 +90,9 @@ class AllsparkCheckTests(unittest.TestCase):
         cls.checker = load_checker()
 
     def test_real_repo_passes(self):
-        names, problems = self.checker.check_repo(REPO_ROOT)
+        names, python_skills, problems = self.checker.check_repo(REPO_ROOT)
         self.assertEqual(sorted(CORE), names)
+        self.assertEqual(["rust-review"], python_skills)
         self.assertEqual([], messages(problems, "error"))
         self.assertEqual([], messages(problems, "warning"))
 
@@ -76,7 +103,7 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "skills" / "rust-review" / "SKILL.md",
                 "---\nname: rust-review\n---\n\n# Review\n",
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertIn("description is required; allspark silently skips a skill without one", messages(problems, "error"))
 
     def test_name_mismatch_fails(self):
@@ -86,7 +113,7 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "skills" / "rust-review" / "SKILL.md",
                 "---\nname: other-name\ndescription: A valid skill.\n---\n",
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("does not match directory" in message for message in messages(problems, "error")))
 
     def test_long_description_fails(self):
@@ -96,7 +123,7 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "skills" / "rust-review" / "SKILL.md",
                 "---\nname: rust-review\ndescription: %s\n---\n" % ("x" * 1025),
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("allspark allows 1024" in message for message in messages(problems, "error")))
 
     def test_disable_model_invocation_fails(self):
@@ -106,7 +133,7 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "skills" / "rust-review" / "SKILL.md",
                 skill("rust-review", extra="disable-model-invocation: true\n"),
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("hides the skill" in message for message in messages(problems, "error")))
 
     def test_claude_only_construct_fails(self):
@@ -116,21 +143,21 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "skills" / "rust-review" / "SKILL.md",
                 skill("rust-review") + "\nRun ${CLAUDE_PLUGIN_ROOT}/bin/check.\n",
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("CLAUDE_PLUGIN_ROOT" in message for message in messages(problems, "error")))
 
     def test_nested_skill_under_evals_is_not_discovered(self):
         with tempfile.TemporaryDirectory() as temp:
             root = build_repo(temp)
             write(root / "skills" / "rust-review" / "evals" / "bad" / "SKILL.md", skill("bad"))
-            names, problems = self.checker.check_repo(root)
+            names, _, problems = self.checker.check_repo(root)
             self.assertEqual(sorted(CORE), names)
             self.assertFalse(any("bad" in message for message in messages(problems, "error")))
 
     def test_missing_core_skill_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             root = build_repo(temp, names=("rust-review", "rust-port"))
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertIn("core skill rust-best-practices is missing", messages(problems, "error"))
 
     def test_package_manifest_override_fails(self):
@@ -140,16 +167,55 @@ class AllsparkCheckTests(unittest.TestCase):
                 root / "package.json",
                 '{"name": "demo", "pi": {"skills": ["other"]}}',
             )
-            _, problems = self.checker.check_repo(root)
+            _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("does not point at skills/" in message for message in messages(problems, "error")))
 
-    def test_python_skill_needs_deliberate_adaptation(self):
+    def test_python_skill_contract_passes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = build_repo(temp)
-            write(root / "skills" / "rust-review" / "pyproject.toml", "[project]\nname='x'\n")
-            write(root / "skills" / "rust-review" / "src" / "rust_review" / "__init__.py", "")
-            _, problems = self.checker.check_repo(root)
-            self.assertTrue(any("Python skill" in message for message in messages(problems, "error")))
+            add_python_package(root)
+            _, python_skills, problems = self.checker.check_repo(root)
+            self.assertEqual(["rust-review"], python_skills)
+            self.assertEqual([], messages(problems, "error"))
+            self.assertEqual([], messages(problems, "warning"))
+
+    def test_python_skill_missing_package_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = build_repo(temp)
+            write(root / "skills" / "rust-review" / "pyproject.toml", VALID_PYPROJECT)
+            _, _, problems = self.checker.check_repo(root)
+            self.assertTrue(any("missing src/rust_review/__init__.py" in message for message in messages(problems, "error")))
+
+    def test_python_skill_runtime_dependency_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = build_repo(temp)
+            add_python_package(
+                root,
+                pyproject=VALID_PYPROJECT.replace(
+                    "dependencies = []", 'dependencies = ["prime-agent-runtime"]'
+                ),
+            )
+            _, _, problems = self.checker.check_repo(root)
+            self.assertTrue(any("prime-agent-runtime" in message for message in messages(problems, "error")))
+
+    def test_python_skill_cli_name_warns(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = build_repo(temp)
+            add_python_package(
+                root,
+                pyproject=VALID_PYPROJECT.replace(
+                    "rust_review = \"rlm.skill:cli\"", "review = \"rlm.skill:cli\""
+                ),
+            )
+            _, _, problems = self.checker.check_repo(root)
+            self.assertTrue(any("must match Python import name" in message for message in messages(problems, "warning")))
+
+    def test_python_skill_invalid_toml_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = build_repo(temp)
+            add_python_package(root, pyproject="[project\nname = 'broken'\n")
+            _, _, problems = self.checker.check_repo(root)
+            self.assertTrue(any("not valid TOML" in message for message in messages(problems, "error")))
 
 
 if __name__ == "__main__":
