@@ -141,7 +141,7 @@ The fork never pushes to `upstream`; its push URL is `no_push`.
 | A `pyproject.toml` turns a skill into a Python skill | **No** | allspark would install a package into the kernel; that is a deliberate fork decision. |
 | The repo moves `skills/` or changes its layout | **No** | Discovery finds no skills; the checker fails. |
 | License or source-attribution changes | **No** | The checker does not judge policy; review the diff. |
-| A merge conflict in a file the fork also edits | **No** | `sync` aborts and lists the paths. The fork deliberately edits no upstream file. |
+| A merge conflict in a file the fork also edits | **No** | `sync` aborts and lists the paths. The fork edits no upstream skill or documentation file; the only upstream edit is three lines in `.gitignore` for Python caches. |
 
 In short: **auto-adaptation is realistic for the normal release path** (content edits, new
 skills, version bumps) because the adapter is a validator, not a transformer. It becomes
