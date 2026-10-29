@@ -1,0 +1,61 @@
+# Fork-only: keep upstream releases adapted to allspark.
+#
+# Runs the same script a maintainer runs locally, but on a branch and behind a
+# pull request. A green PR is the review gate; merge it to publish a fork tag.
+# GitHub disables workflows on forks by default. Enable Actions in the fork's
+# settings once, and keep "Allow GitHub Actions to create and approve pull
+# requests" on (Settings > Actions > General).
+
+name: allspark upstream sync
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Configure git
+        run: |
+          git config user.name "allspark sync"
+          git config user.email "allspark-sync@users.noreply.github.com"
+      - name: Show upstream position
+        run: python3 allspark/sync.py status --fetch
+      - name: Merge, validate, tag, and push the sync branch
+        run: python3 allspark/sync.py sync --apply --full --branch allspark/sync --tag --push
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
+            echo "no sync branch was created; upstream was already current"
+            exit 0
+          fi
+          if [ -z "$(git log origin/main..allspark/sync --oneline)" ]; then
+            echo "sync branch has no commits ahead of main"
+            exit 0
+          fi
+          if gh pr view allspark/sync --json number >/dev/null 2>&1; then
+            gh pr comment allspark/sync --body "Rebuilt from the latest upstream main."
+          else
+            gh pr create \
+              --base main \
+              --head allspark/sync \
+              --title "allspark: sync upstream" \
+              --body "Automated sync from morganlinton/BeautifulRust. The upstream validator, the allspark compatibility checker, the unit tests, the example compiler, and the lint proof all passed before this branch was pushed. Merge with a merge commit, not squash: the fork tag points at the branch commit."
+          fi

@@ -1,0 +1,12 @@
+{
+  "upstream_repo": "https://github.com/morganlinton/BeautifulRust.git",
+  "upstream_commit": "f92961282b83e11757f076e787b4725b38d07b56",
+  "upstream_describe": "v1.4.0-5-gf929612",
+  "upstream_tag": "",
+  "plugin_version": "1.4.0",
+  "synced_at": "2026-10-29T16:15:23Z",
+  "checks": [
+    "upstream validator",
+    "allspark compatibility"
+  ]
+}
