@@ -391,21 +391,29 @@ def _check_upstream_metadata(root: Path, problems: List[Problem]) -> None:
         )
     commit = str(meta.get("upstream_commit") or "")
     if commit and (root / ".git").exists():
-        result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
+        shallow = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
             cwd=str(root),
-            stdout=subprocess.DEVNULL,
+            text=True,
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
-        if result.returncode != 0:
-            problems.append(
-                Problem(
-                    "allspark/upstream.json",
-                    1,
-                    "warning",
-                    "recorded upstream commit is not an ancestor of HEAD; run sync",
-                )
+        if not (shallow.returncode == 0 and shallow.stdout.strip() == "true"):
+            result = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
+                cwd=str(root),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
+            if result.returncode != 0:
+                problems.append(
+                    Problem(
+                        "allspark/upstream.json",
+                        1,
+                        "warning",
+                        "recorded upstream commit is not an ancestor of HEAD; run sync",
+                    )
+                )
 
 
 def _check_python_skill(
