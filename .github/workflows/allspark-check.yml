@@ -1,0 +1,61 @@
+# Fork-only: validate the adaptation when the adapter, the Python skill, or its
+# tests change. Upstream's check.yml already covers the upstream skills, lint
+# config, and Rust examples; this workflow covers the fork layer.
+
+name: allspark check
+
+on:
+  push:
+    paths:
+      - "allspark/**"
+      - "skills/rust-review/**"
+      - "tests/**"
+      - "scripts/check-skill.py"
+      - ".github/workflows/allspark-check.yml"
+  pull_request:
+    paths:
+      - "allspark/**"
+      - "skills/rust-review/**"
+      - "tests/**"
+      - "scripts/check-skill.py"
+      - ".github/workflows/allspark-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allspark-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - name: Unit tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 -m unittest discover -s tests
+      - name: allspark compatibility
+        run: python3 allspark/check.py
+      - name: Upstream skill validator
+        run: python3 scripts/check-skill.py
+      - name: Build and import the Python skill
+        run: |
+          uv venv /tmp/rust-review-venv
+          uv pip install --python /tmp/rust-review-venv/bin/python --editable skills/rust-review
+          /tmp/rust-review-venv/bin/python - <<'PY'
+          import asyncio
+          import rust_review
+
+          out = asyncio.run(rust_review.run("lints/check/src"))
+          assert "Rust review inventory" in out, out[:200]
+          print("rust_review package OK")
+          PY

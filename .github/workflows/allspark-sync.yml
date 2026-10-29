@@ -4,7 +4,7 @@
 # pull request. A green PR is the review gate; merge it to publish a fork tag.
 # GitHub disables workflows on forks by default. Enable Actions in the fork's
 # settings once, and keep "Allow GitHub Actions to create and approve pull
-# requests" on (Settings > Actions > General).
+# requests" on (Settings > Actions > General), or add ALLSPARK_SYNC_TOKEN.
 
 name: allspark upstream sync
 
@@ -16,20 +16,34 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
+
+concurrency:
+  group: allspark-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('lints/check/Cargo.toml', 'scripts/examples.json') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Configure git
         run: |
           git config user.name "allspark sync"
@@ -38,12 +52,47 @@ jobs:
         run: python3 allspark/sync.py status --fetch
       - name: Merge, validate, tag, and push the sync branch
         run: python3 allspark/sync.py sync --apply --full --branch allspark/sync --tag --push
+      - name: Build the pull request summary
+        run: |
+          if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
+            echo "upstream was already current" > "$RUNNER_TEMP/pr-body.md"
+            exit 0
+          fi
+          {
+            echo "Automated sync from morganlinton/BeautifulRust."
+            echo
+            echo "## Upstream commits"
+            echo
+            echo '```'
+            git log --oneline --no-decorate origin/main..allspark/sync
+            echo '```'
+            echo
+            echo "## Files"
+            echo
+            echo '```'
+            git diff --stat origin/main...allspark/sync
+            echo '```'
+            echo
+            echo "## Skills"
+            echo
+            git diff --name-only origin/main...allspark/sync -- 'skills/*/SKILL.md' | sed 's/^/- /' || true
+            echo
+            echo "## Recorded upstream"
+            echo
+            echo '```json'
+            cat allspark/upstream.json
+            echo '```'
+            echo
+            echo "All checks passed: upstream validator, allspark compatibility, unit tests, examples, and lints."
+            echo
+            echo "Merge with a merge commit, not squash: the fork tag points at the branch commit."
+          } > "$RUNNER_TEMP/pr-body.md"
       - name: Open or update the pull request
         env:
-          # A fine-grained PAT with contents:write and pull-requests:write makes
-          # this fully automatic. Without it, github.token is used; if the repo
-          # forbids Actions from creating pull requests, the branch is still
-          # pushed and the notice below prints a compare link.
+          # A fine-grained PAT with contents:write, pull-requests:write, and
+          # issues:write makes this fully automatic. Without it, github.token is
+          # used; if the repo forbids Actions from creating pull requests, the
+          # branch is still pushed and the notice below prints a compare link.
           GH_TOKEN: ${{ secrets.ALLSPARK_SYNC_TOKEN || github.token }}
         run: |
           if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
@@ -55,12 +104,27 @@ jobs:
             exit 0
           fi
           if gh pr view allspark/sync --json number >/dev/null 2>&1; then
+            gh pr edit allspark/sync --body-file "$RUNNER_TEMP/pr-body.md" \
+              || echo "::notice::Could not update the pull request body."
             gh pr comment allspark/sync --body "Rebuilt from the latest upstream main." \
               || echo "::notice::Could not comment on the pull request."
           elif ! gh pr create \
               --base main \
               --head allspark/sync \
               --title "allspark: sync upstream" \
-              --body "Automated sync from morganlinton/BeautifulRust. The upstream validator, the allspark compatibility checker, the unit tests, the example compiler, and the lint proof all passed before this branch was pushed. Merge with a merge commit, not squash: the fork tag points at the branch commit."; then
+              --body-file "$RUNNER_TEMP/pr-body.md"; then
             echo "::notice::Could not create a pull request with the current token. Open one: ${{ github.server_url }}/${{ github.repository }}/compare/main...allspark/sync?expand=1"
+          fi
+      - name: Report a failed sync
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.ALLSPARK_SYNC_TOKEN || github.token }}
+        run: |
+          title="allspark sync failed"
+          body="The scheduled allspark sync failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          number=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body" || true
+          else
+            gh issue create --title "$title" --body "$body" || true
           fi

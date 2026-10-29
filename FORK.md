@@ -32,11 +32,16 @@ allspark package install https://github.com/rager306/BeautifulRust
 Check and sync:
 
 ```bash
+python3 -m unittest discover -s tests
 python3 allspark/check.py
 python3 allspark/sync.py status --fetch
 python3 allspark/sync.py check --full
 python3 allspark/sync.py sync --apply --full --tag
 ```
+
+`allspark-check.yml` runs the Python tests and the package install smoke test on every
+push or pull request that touches the adaptation layer; `allspark-sync.yml` runs the
+upstream sync daily.
 
 `sync` is a dry run without `--apply`. It merges `upstream/main`, runs the upstream
 validator, the allspark checker, the unit tests, the example compiler, and the lint proof,

@@ -178,17 +178,32 @@ create a second source of truth for skill text.
 
 ## GitHub Actions
 
-`.github/workflows/allspark-sync.yml` runs the same script daily and on demand. It creates
-`allspark/sync` and opens a pull request instead of pushing to `main`; a green PR is the
-review gate. Merge the PR with a merge commit, not a squash: the fork tag points at the
-branch commit. If a sync PR is rejected, delete its `allspark-v*-fork.*` tag; it was
-created on the branch before review. GitHub disables workflows on forks by default, so
-enable Actions in the fork's settings once.
+`.github/workflows/allspark-check.yml` runs on every push and pull request that touches
+`allspark/`, `skills/rust-review/`, `tests/`, or `scripts/check-skill.py`. It runs the unit
+tests, the allspark checker, the upstream validator, and an editable install/import smoke
+test for the Python skill. This is the job that catches an adapter regression before the
+next upstream release.
+
+`.github/workflows/allspark-sync.yml` runs the same sync script daily and on demand. It
+creates `allspark/sync` and opens a pull request instead of pushing to `main`; a green PR
+is the review gate. The workflow serializes runs with a concurrency group, has a 30-minute
+timeout, caches the Cargo registry, writes the PR body from the actual diff, and opens or
+comments on an issue when a run fails. Merge the PR with a merge commit, not a squash: the
+fork tag points at the branch commit. If a sync PR is rejected, delete its
+`allspark-v*-fork.*` tag; it was created on the branch before review. GitHub disables
+workflows on forks by default, so enable Actions in the fork's settings once.
 
 The workflow uses `github.token` by default. If the repo does not allow Actions to create
 pull requests (Settings > Actions > General), add a fine-grained `ALLSPARK_SYNC_TOKEN`
-secret with `contents: write` and `pull-requests: write`; otherwise the branch is still
-pushed and the job prints a compare link instead of failing.
+secret with `contents: write`, `pull-requests: write`, and `issues: write`; otherwise the
+branch is still pushed and the job prints a compare link instead of failing.
+
+## Python skill tests
+
+`tests/test_rust_review.py` covers the `rust_review` inventory: file selection,
+`include_tests`, `max_files`, a single file, and a missing path. The check workflow also
+installs the package editable into a clean venv and imports it, so a broken
+`pyproject.toml` or `src/` layout fails CI.
 
 ## Layout
 
