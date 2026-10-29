@@ -8,14 +8,14 @@ on:
   push:
     paths:
       - "allspark/**"
-      - "skills/rust-review/**"
+      - "skills/**"
       - "tests/**"
       - "scripts/check-skill.py"
       - ".github/workflows/allspark-check.yml"
   pull_request:
     paths:
       - "allspark/**"
-      - "skills/rust-review/**"
+      - "skills/**"
       - "tests/**"
       - "scripts/check-skill.py"
       - ".github/workflows/allspark-check.yml"
