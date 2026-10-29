@@ -27,6 +27,11 @@ and the package resolver finds `skills/rust-best-practices`, `skills/rust-review
 `skills/rust-port`. `allspark package list` reports the package; `allspark package update`
 updates it from the fork.
 
+End-to-end, with `ALLSPARK_HOME=/root/.allspark-home`, a new session built
+`rust-review==0.1.0` into the kernel venv and `await rust_review("lints/check/src")`
+returned the inventory. The same run showed why the home must be pinned: the nested home
+had an empty `auth.json`, and the provider rejected the request with HTTP 400.
+
 What does **not** carry over, and does not need to:
 
 | Upstream piece | In allspark |
@@ -70,6 +75,31 @@ Remove:
 
 ```bash
 allspark package remove https://github.com/rager306/BeautifulRust
+```
+
+### Home and ALLSPARK_HOME
+
+The launcher derives the home as `$HOME/.allspark-home` when `ALLSPARK_HOME` is unset. If
+the shell already runs with `HOME=~/.allspark-home` — an allspark session, or a harness
+that sets HOME that way — the launcher creates a second, nested `.allspark-home`. That
+nested home has its own empty `auth.json` and its own package list, so a session started
+there fails with a provider 400 even though the package is installed in the other home.
+
+Pin the existing outer home for every command:
+
+```bash
+export ALLSPARK_HOME=/root/.allspark-home   # or your existing ~/.allspark-home
+allspark package list
+allspark package install https://github.com/rager306/BeautifulRust
+```
+
+The canonical package path is
+`$ALLSPARK_HOME/.prime/agent/git/github.com/rager306/BeautifulRust`. If a package was
+already installed into the nested home, remove that duplicate:
+
+```bash
+ALLSPARK_HOME=/root/.allspark-home/.allspark-home \
+  allspark package remove https://github.com/rager306/BeautifulRust
 ```
 
 Without the package manager, copy the three skill folders into the directory allspark

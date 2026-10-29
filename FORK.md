@@ -29,6 +29,10 @@ Install in allspark:
 allspark package install https://github.com/rager306/BeautifulRust
 ```
 
+If `HOME` already ends with `.allspark-home` (an allspark session or a harness), prefix
+the command with `ALLSPARK_HOME=~/.allspark-home`; otherwise the launcher nests a second
+home with its own empty `auth.json`.
+
 Check and sync:
 
 ```bash

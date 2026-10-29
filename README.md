@@ -128,6 +128,10 @@ allspark reads `skills/*/SKILL.md` directly. `rust-review` also ships a
 Python kernel; `SKILL.md` documents the call. Update it with
 `allspark package update`.
 
+If your shell already runs with `HOME=~/.allspark-home` (an allspark session or a harness
+that sets HOME that way), set `ALLSPARK_HOME=~/.allspark-home` before these commands. The
+launcher would otherwise create a nested `.allspark-home` with its own empty `auth.json`.
+
 The commands in the other sections name the upstream repository. To install this fork's
 skill folders with the same tools, replace `morganlinton/BeautifulRust` with
 `rager306/BeautifulRust`.
