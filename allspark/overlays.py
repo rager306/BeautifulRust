@@ -47,6 +47,12 @@ RELOAD_POLICY = """\
 > registry.
 """
 
+PYTHON_CACHES = """\
+# allspark:python-caches
+__pycache__/
+*.pyc
+"""
+
 OVERLAYS: List[Dict[str, str]] = [
     {
         "path": "skills/rust-review/SKILL.md",
@@ -61,6 +67,13 @@ OVERLAYS: List[Dict[str, str]] = [
         "anchor": "### allspark",
         "position": "after",
         "text": RELOAD_POLICY,
+    },
+    {
+        "path": ".gitignore",
+        "marker": "# allspark:python-caches",
+        "anchor": "lints/check/Cargo.lock",
+        "position": "after",
+        "text": PYTHON_CACHES,
     },
 ]
 

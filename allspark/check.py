@@ -537,23 +537,111 @@ def _check_python_skill(
             )
 
 
-def _check_overlays(root: Path, problems: List[Problem]) -> None:
+def _load_overlay_module(root: Path):
     path = root / "allspark" / "overlays.py"
     if not path.is_file():
-        return
+        return None
     spec = importlib.util.spec_from_file_location("allspark_overlays", path)
     if spec is None or spec.loader is None:
-        problems.append(Problem("allspark/overlays.py", 1, "error", "cannot load overlay module"))
-        return
+        return None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _check_overlays(root: Path, problems: List[Problem]) -> None:
     try:
-        spec.loader.exec_module(module)
+        module = _load_overlay_module(root)
+    except Exception as error:  # pragma: no cover - defensive
+        problems.append(Problem("allspark/overlays.py", 1, "error", "cannot load overlay module: %s" % error))
+        return
+    if module is None:
+        return
+    try:
         messages = module.check(root)
     except Exception as error:  # pragma: no cover - defensive
         problems.append(Problem("allspark/overlays.py", 1, "error", "cannot check overlays: %s" % error))
         return
     for message in messages:
+        problems.append(Problem("allspark/overlays.py", 1, "error", message))
+
+
+FORK_ONLY_FILES = {
+    "FORK.md",
+    "skills/rust-review/pyproject.toml",
+    "tests/test_allspark_check.py",
+    "tests/test_allspark_overlays.py",
+    "tests/test_rust_review.py",
+    ".github/workflows/allspark-check.yml",
+    ".github/workflows/allspark-sync.yml",
+}
+FORK_ONLY_PREFIXES = (
+    "allspark/",
+    "skills/rust-review/src/",
+    ".github/workflows/allspark-",
+)
+
+
+def _protected_edit_problems(paths: Sequence[str], overlay_paths: set[str]) -> List[str]:
+    problems: List[str] = []
+    for path in paths:
+        if path in overlay_paths or path in FORK_ONLY_FILES:
+            continue
+        if path.startswith(FORK_ONLY_PREFIXES):
+            continue
+        problems.append(
+            "fork edits upstream file %s without an overlay; move the change to a fork-only file or add an overlay in allspark/overlays.py"
+            % path
+        )
+    return problems
+
+
+def _check_protected_edits(root: Path, problems: List[Problem]) -> None:
+    if not (root / ".git").exists():
+        return
+    meta_path = root / "allspark" / "upstream.json"
+    if not meta_path.is_file():
+        return
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    base = str(meta.get("upstream_commit") or "")
+    if not base:
+        return
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=str(root),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if shallow.returncode == 0 and shallow.stdout.strip() == "true":
+        return
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base, "HEAD"],
+        cwd=str(root),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if ancestor.returncode != 0:
+        return
+    try:
+        module = _load_overlay_module(root)
+        overlay_paths = {overlay["path"] for overlay in module.OVERLAYS} if module else set()
+    except Exception:
+        overlay_paths = set()
+    diff = subprocess.run(
+        ["git", "diff", "--name-only", base, "HEAD"],
+        cwd=str(root),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if diff.returncode != 0:
+        return
+    for message in _protected_edit_problems(diff.stdout.splitlines(), overlay_paths):
         problems.append(Problem("allspark/overlays.py", 1, "error", message))
 
 
@@ -628,6 +716,7 @@ def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
     _check_upstream_metadata(root, problems)
     _check_install_path(root, problems)
     _check_overlays(root, problems)
+    _check_protected_edits(root, problems)
     return sorted(names), sorted(python_skills), problems
 
 

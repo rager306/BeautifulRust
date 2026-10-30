@@ -210,6 +210,24 @@ class AllsparkCheckTests(unittest.TestCase):
             _, _, problems = self.checker.check_repo(root)
             self.assertTrue(any("must match Python import name" in message for message in messages(problems, "warning")))
 
+    def test_protected_edit_classifier(self):
+        problems = self.checker._protected_edit_problems(
+            [
+                "README.md",
+                "allspark/check.py",
+                "FORK.md",
+                "tests/test_rust_review.py",
+                "skills/rust-review/src/rust_review/__init__.py",
+                ".github/workflows/allspark-check.yml",
+                "skills/rust-best-practices/SKILL.md",
+                "CHANGELOG.md",
+            ],
+            {"README.md"},
+        )
+        self.assertEqual(2, len(problems))
+        self.assertTrue(any("skills/rust-best-practices/SKILL.md" in problem for problem in problems))
+        self.assertTrue(any("CHANGELOG.md" in problem for problem in problems))
+
     def test_nested_allspark_home_warns(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / ".allspark-home" / ".allspark-home"

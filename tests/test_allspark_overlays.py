@@ -35,6 +35,7 @@ def fixture(root):
         "# Rust review\n\n## 5. Offer the lints\n\nSuggest the lints config.\n",
     )
     write(Path(root) / "README.md", "# Demo\n\n### allspark\n\nInstall it.\n")
+    write(Path(root) / ".gitignore", ".DS_Store\nlints/check/Cargo.lock\n")
     return Path(root)
 
 
@@ -47,12 +48,14 @@ class OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = fixture(temp)
             self.assertEqual(
-                ["skills/rust-review/SKILL.md", "README.md"], self.overlays.apply(root)
+                ["skills/rust-review/SKILL.md", "README.md", ".gitignore"],
+                self.overlays.apply(root),
             )
             self.assertEqual([], self.overlays.apply(root))
             self.assertEqual([], self.overlays.check(root))
             self.assertIn("allspark:review-policy", (root / "skills" / "rust-review" / "SKILL.md").read_text())
             self.assertIn("allspark:reload-policy", (root / "README.md").read_text())
+            self.assertIn("allspark:python-caches", (root / ".gitignore").read_text())
 
     def test_marker_is_restored_from_anchor(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -77,7 +80,7 @@ class OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = fixture(temp)
             problems = self.overlays.check(root)
-            self.assertEqual(2, len(problems))
+            self.assertEqual(3, len(problems))
 
     def test_real_repo_is_applied(self):
         self.assertEqual([], self.overlays.check(REPO_ROOT))

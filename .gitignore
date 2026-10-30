@@ -2,5 +2,6 @@
 lints/check/target/
 lints/check/Cargo.lock
 
+# allspark:python-caches
 __pycache__/
 *.pyc
