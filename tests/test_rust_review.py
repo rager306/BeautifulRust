@@ -32,7 +32,14 @@ pub fn parse(input: &str) -> Config {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn parses() {}
+    fn parses() {
+        let _ = "1".parse::<u8>().unwrap();
+    }
+}
+
+#[test]
+fn inline_test_unwrap() {
+    let _ = "2".parse::<u8>().unwrap();
 }
 """
 
@@ -59,16 +66,24 @@ class RustReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Rust review inventory", output)
         self.assertIn("src/lib.rs", output)
         self.assertIn("public API", output)
-        self.assertIn("`unwrap()`", output)
+        self.assertIn("- `unwrap()`: 1", output)
         self.assertIn("unsafe blocks", output)
-        self.assertIn("test markers", output)
+        self.assertIn("inline tests excluded", output)
+        self.assertIn("test_markers 3", output)
         self.assertIn("test files skipped", output)
         self.assertNotIn("tests/it.rs", output)
+
+    async def test_include_inline_tests(self):
+        output = await rust_review.run(str(self.root), include_inline_tests=True)
+        self.assertIn("- `unwrap()`: 3", output)
+        self.assertIn("inline tests included", output)
+        self.assertNotIn("inline tests excluded", output)
 
     async def test_include_tests(self):
         output = await rust_review.run(str(self.root), include_tests=True)
         self.assertIn("tests/it.rs", output)
         self.assertIn("test markers", output)
+        self.assertNotIn("test files skipped", output)
 
     async def test_max_files_truncates(self):
         output = await rust_review.run(str(self.root), include_tests=True, max_files=1)

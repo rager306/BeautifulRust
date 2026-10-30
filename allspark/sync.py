@@ -256,6 +256,22 @@ def sync(apply: bool, full: bool, branch: Optional[str], tag: bool, push: bool) 
             print("  " + path)
         return 2
 
+    print("applying fork overlays...")
+    overlay = subprocess.run(
+        [sys.executable, "allspark/overlays.py", "apply"],
+        cwd=str(ROOT),
+        text=True,
+        capture_output=True,
+    )
+    if overlay.returncode != 0:
+        print(overlay.stdout.strip())
+        print(overlay.stderr.strip())
+        git("merge", "--abort")
+        print("overlay failed; merge aborted")
+        return 1
+    if overlay.stdout.strip():
+        print(overlay.stdout.strip())
+
     checks = run_checks(full)
     if len(checks) < (5 if full else 2):
         git("merge", "--abort")
@@ -263,7 +279,7 @@ def sync(apply: bool, full: bool, branch: Optional[str], tag: bool, push: bool) 
         return 1
 
     write_meta(checks)
-    git("add", str(META_PATH.relative_to(ROOT)))
+    git("add", "-A")
     message = "chore(allspark): sync upstream %s (%s)" % (describe, short)
     commit = git("commit", "-m", message)
     if commit.returncode != 0:

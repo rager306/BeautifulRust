@@ -179,6 +179,23 @@ Rules for each finding:
 - **"What's already good" is required.** It tells the author what to keep and makes the
   rest credible.
 
+<!-- allspark:review-policy -->
+## Allspark review policy
+
+These rules override the generic guidance above when this skill runs in allspark.
+
+- **Formatting drift is a report, not a fix.** `cargo fmt --check` tells you the tree is
+  not clean. Do not run `cargo fmt` across the tree unless the user asked for a formatting
+  change: a whole-tree reformat hides the review diff. Report the drift and leave the fix
+  as a separate task.
+- **Internal crates use simplicity mode.** If `Cargo.toml` has `publish = false`, or the
+  crate is only used inside the workspace, treat it as application code even when it has a
+  `lib.rs`: do not demand `missing_docs` on every item, `#[non_exhaustive]`, builders, or
+  sealed traits. The project's ADR/architecture and its own callers are the contract.
+- **Inventory counts are candidates, not bugs.** `rust_review` excludes inline `#[test]`
+  and `#[cfg(test)]` code by default; pass `include_inline_tests=True` only when you want
+  test coverage included. A `.clone()` count is a list of candidates, not redundant clones.
+
 ## 5. Offer the lints
 
 If the project lacks a `[lints]` table, end the report by suggesting the BeautifulRust

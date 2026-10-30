@@ -104,6 +104,14 @@ ALLSPARK_HOME=/root/.allspark-home/.allspark-home \
   allspark package remove https://github.com/rager306/BeautifulRust
 ```
 
+### Reload after install
+
+allspark resolves a package's skills at session start. After `package install` or
+`package update`, run `/reload` in an interactive session or start a new session. The
+current session's system prompt will not list the new skills. `settings.skills` is a
+filter/override, not the package registry; `allspark package list` showing the package
+does not mean the running session has loaded it.
+
 Without the package manager, copy the three skill folders into the directory allspark
 actually scans for user skills, `$PRIME_AGENT_CODING_AGENT_DIR/skills` (the launcher sets
 that to `$ALLSPARK_HOME/.prime/agent/skills`), or into a project's
@@ -152,13 +160,28 @@ print(await rust_review("src", include_tests=False))
 
 The call returns a markdown inventory: files, public API items, `unwrap()`/`expect()`,
 `panic!`, unsafe blocks, `// SAFETY:` comments, test markers, clones, and
-`Rc`/`Arc<RefCell<..>>`, each with `file:line` references. It is evidence, not a verdict;
-the agent still reads the code and writes the prioritized report. `SKILL.md` documents the
-call under "Run the tools first".
+`Rc`/`Arc<RefCell<..>>`, each with `file:line` references. By default it excludes inline
+`#[test]` functions and `#[cfg(test)]` modules and reports them separately under
+"inline tests excluded"; pass `include_inline_tests=True` to include them. A `.clone()`
+entry is a candidate, not a judgement. The agent still reads the code and writes the
+prioritized report; `SKILL.md` documents the call under "Run the tools first".
 
 The package has no third-party dependencies. `uv pip install --editable` with hatchling
 build isolation was tested in a clean venv, and the upstream validators do not reject the
 extra files.
+
+## Upstream overlays
+
+Some fork changes must touch upstream files: the reload note in `README.md` and the
+review policy in `skills/rust-review/SKILL.md`. The text lives in `allspark/overlays.py`;
+`sync.py` applies it after every upstream merge, and `check.py` fails if a marker is
+missing. If upstream changes an anchor, the sync aborts with the exact path and anchor
+instead of silently dropping the policy. Apply and verify manually:
+
+```bash
+python3 allspark/overlays.py apply
+python3 allspark/overlays.py check
+```
 
 ## Sync with upstream
 
@@ -243,6 +266,7 @@ installs the package editable into a clean venv and imports it, so a broken
 allspark/
 ├── README.md         this file
 ├── check.py          allspark compatibility validator
+├── overlays.py       fork-only text overlays, re-applied after sync
 ├── sync.py           fetch → merge → validate → tag
 └── upstream.json     last synced upstream commit and check result
 

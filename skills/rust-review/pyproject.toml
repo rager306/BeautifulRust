@@ -1,6 +1,6 @@
 [project]
 name = "rust-review"
-version = "0.1.0"
+version = "0.2.0"
 description = "Inventory Rust code for the rust-review Agent Skill."
 requires-python = ">=3.10"
 dependencies = []

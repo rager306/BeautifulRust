@@ -117,6 +117,12 @@ Install all three; the review and port skills lean on the best-practices skill f
 
 ### allspark
 
+<!-- allspark:reload-policy -->
+> **After `allspark package install` or `update`**, run `/reload` in an interactive
+> session or start a new session. allspark resolves package skills at session start, so
+> the current session will not list them. `settings.skills` is a filter, not the package
+> registry.
+
 This fork is a drop-in allspark capability package:
 
 ```bash

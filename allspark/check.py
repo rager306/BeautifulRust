@@ -16,6 +16,7 @@ Exit code 1 means the fork needs a manual adaptation before the next release.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
@@ -536,6 +537,26 @@ def _check_python_skill(
             )
 
 
+def _check_overlays(root: Path, problems: List[Problem]) -> None:
+    path = root / "allspark" / "overlays.py"
+    if not path.is_file():
+        return
+    spec = importlib.util.spec_from_file_location("allspark_overlays", path)
+    if spec is None or spec.loader is None:
+        problems.append(Problem("allspark/overlays.py", 1, "error", "cannot load overlay module"))
+        return
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        messages = module.check(root)
+    except Exception as error:  # pragma: no cover - defensive
+        problems.append(Problem("allspark/overlays.py", 1, "error", "cannot check overlays: %s" % error))
+        return
+    for message in messages:
+        problems.append(Problem("allspark/overlays.py", 1, "error", message))
+
+
 def _check_install_path(root: Path, problems: List[Problem]) -> None:
     parts = root.parts
     for index, part in enumerate(parts):
@@ -606,6 +627,7 @@ def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
     _check_package_manifest(root, problems)
     _check_upstream_metadata(root, problems)
     _check_install_path(root, problems)
+    _check_overlays(root, problems)
     return sorted(names), sorted(python_skills), problems
 
 
