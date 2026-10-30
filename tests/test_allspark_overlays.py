@@ -34,7 +34,7 @@ def fixture(root):
         Path(root) / "skills" / "rust-review" / "SKILL.md",
         "# Rust review\n\n## 5. Offer the lints\n\nSuggest the lints config.\n",
     )
-    write(Path(root) / "README.md", "# Demo\n\n### allspark\n\nInstall it.\n")
+    write(Path(root) / "README.md", "# Beautiful Rust\n\nUpstream intro.\n")
     write(Path(root) / ".gitignore", ".DS_Store\nlints/check/Cargo.lock\n")
     return Path(root)
 
@@ -54,7 +54,7 @@ class OverlayTests(unittest.TestCase):
             self.assertEqual([], self.overlays.apply(root))
             self.assertEqual([], self.overlays.check(root))
             self.assertIn("allspark:review-policy", (root / "skills" / "rust-review" / "SKILL.md").read_text())
-            self.assertIn("allspark:reload-policy", (root / "README.md").read_text())
+            self.assertIn("allspark:fork-note", (root / "README.md").read_text())
             self.assertIn("allspark:python-caches", (root / ".gitignore").read_text())
 
     def test_marker_is_restored_from_anchor(self):

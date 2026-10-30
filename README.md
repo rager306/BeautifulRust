@@ -4,6 +4,12 @@
 
 # Beautiful Rust
 
+<!-- allspark:fork-note -->
+> **allspark fork.** This repository is the
+> [allspark](https://github.com/rager306/allspark) fork of BeautifulRust. Install, the
+> Python-backed `rust_review` skill, reload instructions, and upstream sync are documented
+> in [FORK.md](FORK.md) and [allspark/README.md](allspark/README.md).
+
 Three standard [Agent Skills](https://agentskills.io) and a lints config that teach coding
 agents to write, review, port, and enforce idiomatic Rust:
 
@@ -19,19 +25,6 @@ agents to write, review, port, and enforce idiomatic Rust:
 They work with Claude Code, OpenAI Codex, GitHub Copilot, Cursor, Gemini CLI, and any other
 agent that reads the Agent Skills format. Every code example in the skills compiles on
 stable Rust, and every lint in the config was checked against current clippy.
-
-> **allspark fork.** This repository is the
-> [allspark](https://github.com/rager306/allspark) fork of BeautifulRust. The three skills
-> load in allspark as a capability package, and `rust-review` is Python-backed:
->
-> ```bash
-> allspark package install https://github.com/rager306/BeautifulRust
-> ```
->
-> In an allspark session, `await rust_review("src")` returns a review inventory. The rest
-> of this README describes the upstream project; see
-> [`allspark/README.md`](allspark/README.md) for the compatibility contract, the Python
-> skill, and upstream sync.
 
 The guidance is distilled from five sources, with a condensed digest of each bundled in
 the skill so the agent can consult the original reasoning when it needs to:
@@ -114,33 +107,6 @@ passed 29 of 30 checks against 24 of 30 without it. See [Testing the skills](#te
 Each skill is a folder under `skills/`: `rust-best-practices/`, `rust-review/`, and
 `rust-port/`. Every option below puts those folders where your agent looks for skills.
 Install all three; the review and port skills lean on the best-practices skill for style.
-
-### allspark
-
-<!-- allspark:reload-policy -->
-> **After `allspark package install` or `update`**, run `/reload` in an interactive
-> session or start a new session. allspark resolves package skills at session start, so
-> the current session will not list them. `settings.skills` is a filter, not the package
-> registry.
-
-This fork is a drop-in allspark capability package:
-
-```bash
-allspark package install https://github.com/rager306/BeautifulRust
-```
-
-allspark reads `skills/*/SKILL.md` directly. `rust-review` also ships a
-`pyproject.toml` and `src/rust_review/`, so allspark installs `rust_review` into its
-Python kernel; `SKILL.md` documents the call. Update it with
-`allspark package update`.
-
-If your shell already runs with `HOME=~/.allspark-home` (an allspark session or a harness
-that sets HOME that way), set `ALLSPARK_HOME=~/.allspark-home` before these commands. The
-launcher would otherwise create a nested `.allspark-home` with its own empty `auth.json`.
-
-The commands in the other sections name the upstream repository. To install this fork's
-skill folders with the same tools, replace `morganlinton/BeautifulRust` with
-`rager306/BeautifulRust`.
 
 ### Any agent, one command
 
@@ -334,20 +300,13 @@ BeautifulRust/
 ├── .claude-plugin/
 │   ├── plugin.json         plugin manifest
 │   └── marketplace.json    lets this repo act as its own marketplace
-├── allspark/                 fork-only adaptation layer
-│   ├── check.py              compatibility checker for the allspark loader
-│   ├── sync.py               fetch, merge, validate, tag upstream releases
-│   ├── upstream.json         last synced upstream commit and checks
-│   └── README.md             compatibility contract and update procedure
 ├── skills/
 │   ├── rust-best-practices/   writing skill
 │   │   ├── SKILL.md
 │   │   ├── references/        one digest per source, plus bevy.md
 │   │   └── evals/
-│   ├── rust-review/           review skill, Python-backed in allspark
+│   ├── rust-review/           review skill
 │   │   ├── SKILL.md
-│   │   ├── pyproject.toml     allspark Python-skill manifest
-│   │   ├── src/rust_review/   rust_review() review inventory
 │   │   └── evals/
 │   └── rust-port/             porting skill
 │       ├── SKILL.md
@@ -367,7 +326,6 @@ BeautifulRust/
 │   └── review-inventory.md    a real review report
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
-├── FORK.md                    fork orientation and remotes
 └── README.md
 ```
 
@@ -421,9 +379,6 @@ Validate before pushing. `python3 scripts/check-skill.py` checks skill
 frontmatter, links, eval cases, and plugin manifests. Pass `--json` for
 machine-readable output. `python3 scripts/check-examples.py` compiles every Rust
 block in the skills, reference digests, README, and examples with `cargo check`.
-In the allspark fork, `python3 allspark/sync.py check --full` also runs the allspark
-compatibility checker and the Python-skill contract; see
-[`allspark/README.md`](allspark/README.md).
 
 ```bash
 python3 scripts/check-skill.py

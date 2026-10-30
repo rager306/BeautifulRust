@@ -43,17 +43,6 @@ cargo clippy --all-targets --all-features -- -W clippy::pedantic
 cargo test
 ```
 
-In allspark, the `rust_review` Python skill gathers the mechanical inventory before you
-read:
-
-```python
-print(await rust_review("src", include_tests=False))
-```
-
-It reports files, public API items, panic sites, unsafe blocks, clones, and test markers
-with `file:line` references. Treat it as a map, not a verdict; keep the judgment and the
-rule citations in the report.
-
 Don't paste raw clippy output. Group repeated warnings into one finding, and skip pedantic
 lints that don't matter for this code. If the tools aren't available, say so in the report
 and review by reading.
@@ -192,6 +181,10 @@ These rules override the generic guidance above when this skill runs in allspark
   crate is only used inside the workspace, treat it as application code even when it has a
   `lib.rs`: do not demand `missing_docs` on every item, `#[non_exhaustive]`, builders, or
   sealed traits. The project's ADR/architecture and its own callers are the contract.
+- **Use the inventory as a map.** In allspark, `await rust_review("src")` gathers the
+  mechanical inventory (files, public API, panics, unsafe, clones, test markers) with
+  `file:line` references. Treat it as evidence, not a verdict; the report still needs the
+  judgment and rule citations above.
 - **Inventory counts are candidates, not bugs.** `rust_review` excludes inline `#[test]`
   and `#[cfg(test)]` code by default; pass `include_inline_tests=True` only when you want
   test coverage included. A `.clone()` count is a list of candidates, not redundant clones.

@@ -272,6 +272,10 @@ def sync(apply: bool, full: bool, branch: Optional[str], tag: bool, push: bool) 
     if overlay.stdout.strip():
         print(overlay.stdout.strip())
 
+    # The overlay-only check compares against upstream.json, so record the new
+    # upstream commit before validating. A failed check aborts the merge and
+    # restores the file.
+    write_meta([])
     checks = run_checks(full)
     if len(checks) < (5 if full else 2):
         git("merge", "--abort")

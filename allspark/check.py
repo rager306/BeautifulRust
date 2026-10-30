@@ -645,6 +645,66 @@ def _check_protected_edits(root: Path, problems: List[Problem]) -> None:
         problems.append(Problem("allspark/overlays.py", 1, "error", message))
 
 
+def _check_overlay_only_edits(root: Path, problems: List[Problem]) -> None:
+    if not (root / ".git").exists():
+        return
+    meta_path = root / "allspark" / "upstream.json"
+    if not meta_path.is_file():
+        return
+    try:
+        base = str(json.loads(meta_path.read_text(encoding="utf-8")).get("upstream_commit") or "")
+    except (OSError, json.JSONDecodeError):
+        return
+    if not base:
+        return
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=str(root),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if shallow.returncode == 0 and shallow.stdout.strip() == "true":
+        return
+    try:
+        module = _load_overlay_module(root)
+    except Exception as error:  # pragma: no cover - defensive
+        problems.append(Problem("allspark/overlays.py", 1, "error", "cannot load overlay module: %s" % error))
+        return
+    if module is None:
+        return
+    for overlay in module.OVERLAYS:
+        path = overlay["path"]
+        shown = subprocess.run(
+            ["git", "show", "%s:%s" % (base, path)],
+            cwd=str(root),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        if shown.returncode != 0:
+            continue
+        try:
+            expected = module.render(shown.stdout, overlay)
+        except Exception as error:
+            problems.append(Problem(path, 1, "error", "cannot render overlay: %s" % error))
+            continue
+        try:
+            current = (root / path).read_text(encoding="utf-8")
+        except OSError as error:
+            problems.append(Problem(path, 1, "error", str(error)))
+            continue
+        if current != expected:
+            problems.append(
+                Problem(
+                    path,
+                    1,
+                    "error",
+                    "fork edits outside the overlay; move them to a fork-only file or extend allspark/overlays.py",
+                )
+            )
+
+
 def _check_install_path(root: Path, problems: List[Problem]) -> None:
     parts = root.parts
     for index, part in enumerate(parts):
@@ -716,6 +776,7 @@ def check_repo(root: Path) -> Tuple[List[str], List[str], List[Problem]]:
     _check_upstream_metadata(root, problems)
     _check_install_path(root, problems)
     _check_overlays(root, problems)
+    _check_overlay_only_edits(root, problems)
     _check_protected_edits(root, problems)
     return sorted(names), sorted(python_skills), problems
 

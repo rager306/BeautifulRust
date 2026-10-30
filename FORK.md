@@ -12,7 +12,8 @@ Both projects implement the Agent Skills standard, so allspark's package resolve
 `skills/*/SKILL.md` directly. The fork also makes `rust-review` a Python-backed skill:
 `skills/rust-review/pyproject.toml` and `src/rust_review/` expose an inventory call in
 allspark's kernel. The few edits to upstream files live in `allspark/overlays.py` and are
-re-applied after every sync, so an upstream release does not silently drop them.
+re-applied after every sync. `check.py` compares each overlay file with upstream plus the
+overlay text, so an edit outside the overlay is an error, not a silent difference.
 
 ## Remotes
 

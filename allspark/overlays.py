@@ -34,17 +34,21 @@ These rules override the generic guidance above when this skill runs in allspark
   crate is only used inside the workspace, treat it as application code even when it has a
   `lib.rs`: do not demand `missing_docs` on every item, `#[non_exhaustive]`, builders, or
   sealed traits. The project's ADR/architecture and its own callers are the contract.
+- **Use the inventory as a map.** In allspark, `await rust_review("src")` gathers the
+  mechanical inventory (files, public API, panics, unsafe, clones, test markers) with
+  `file:line` references. Treat it as evidence, not a verdict; the report still needs the
+  judgment and rule citations above.
 - **Inventory counts are candidates, not bugs.** `rust_review` excludes inline `#[test]`
   and `#[cfg(test)]` code by default; pass `include_inline_tests=True` only when you want
   test coverage included. A `.clone()` count is a list of candidates, not redundant clones.
 """
 
-RELOAD_POLICY = """\
-<!-- allspark:reload-policy -->
-> **After `allspark package install` or `update`**, run `/reload` in an interactive
-> session or start a new session. allspark resolves package skills at session start, so
-> the current session will not list them. `settings.skills` is a filter, not the package
-> registry.
+FORK_NOTE = """\
+<!-- allspark:fork-note -->
+> **allspark fork.** This repository is the
+> [allspark](https://github.com/rager306/allspark) fork of BeautifulRust. Install, the
+> Python-backed `rust_review` skill, reload instructions, and upstream sync are documented
+> in [FORK.md](FORK.md) and [allspark/README.md](allspark/README.md).
 """
 
 PYTHON_CACHES = """\
@@ -63,10 +67,10 @@ OVERLAYS: List[Dict[str, str]] = [
     },
     {
         "path": "README.md",
-        "marker": "<!-- allspark:reload-policy -->",
-        "anchor": "### allspark",
+        "marker": "<!-- allspark:fork-note -->",
+        "anchor": "# Beautiful Rust",
         "position": "after",
-        "text": RELOAD_POLICY,
+        "text": FORK_NOTE,
     },
     {
         "path": ".gitignore",
@@ -82,25 +86,30 @@ class OverlayError(RuntimeError):
     pass
 
 
-def _apply_one(root: Path, overlay: Dict[str, str]) -> Optional[str]:
-    path = root / overlay["path"]
-    if not path.is_file():
-        raise OverlayError("%s: file is missing" % overlay["path"])
-    text = path.read_text(encoding="utf-8")
-    if overlay["marker"] in text:
-        return None
+def render(base_text: str, overlay: Dict[str, str]) -> str:
+    if overlay["marker"] in base_text:
+        return base_text
     anchor = overlay["anchor"]
-    if anchor not in text:
+    if anchor not in base_text:
         raise OverlayError(
             "%s: anchor missing: %r; upstream changed the file, update allspark/overlays.py"
             % (overlay["path"], anchor)
         )
     block = overlay["text"].rstrip() + "\n\n"
     if overlay["position"] == "before":
-        text = text.replace(anchor, block + anchor, 1)
-    else:
-        text = text.replace(anchor, anchor + "\n\n" + block.rstrip(), 1)
-    path.write_text(text, encoding="utf-8")
+        return base_text.replace(anchor, block + anchor, 1)
+    return base_text.replace(anchor, anchor + "\n\n" + block.rstrip(), 1)
+
+
+def _apply_one(root: Path, overlay: Dict[str, str]) -> Optional[str]:
+    path = root / overlay["path"]
+    if not path.is_file():
+        raise OverlayError("%s: file is missing" % overlay["path"])
+    text = path.read_text(encoding="utf-8")
+    updated = render(text, overlay)
+    if updated == text:
+        return None
+    path.write_text(updated, encoding="utf-8")
     return overlay["path"]
 
 

@@ -174,13 +174,15 @@ extra files.
 
 ## Upstream overlays
 
-Some fork changes must touch upstream files: the reload note in `README.md`, the review
+Some fork changes must touch upstream files: the fork note in `README.md`, the review
 policy in `skills/rust-review/SKILL.md`, and the Python-cache lines in `.gitignore`. The
 text lives in `allspark/overlays.py`; `sync.py` applies it after every upstream merge, and
 `check.py` fails if a marker is missing. If upstream changes an anchor, the sync aborts
 with the exact path and anchor instead of silently dropping the policy. `check.py` also
 fails when a commit edits an upstream file that is neither an overlay target nor on the
-fork-only allowlist. Apply and verify manually:
+fork-only allowlist. For every overlay file it compares the working tree with
+`git show <upstream-commit>:<path>` plus the overlay text, so an extra fork edit outside
+the overlay is an error, not a silent difference. Apply and verify manually:
 
 ```bash
 python3 allspark/overlays.py apply
