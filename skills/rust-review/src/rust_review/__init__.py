@@ -346,16 +346,16 @@ def _summary(
 async def run(
     path: str = ".",
     include_tests: bool = False,
-    include_inline_tests: bool = False,
     max_files: int = DEFAULT_MAX_FILES,
+    include_inline_tests: bool = False,
 ) -> str:
     """Summarize a Rust tree for review: files, public API, panics, unsafe, tests, clones.
 
     Args:
         path: A Rust file or a directory to scan.
         include_tests: Include files under tests/ and *_test.rs.
-        include_inline_tests: Include `#[test]` functions and `#[cfg(test)]` modules.
         max_files: Maximum number of Rust files to read. The rest are counted but not read.
+        include_inline_tests: Include `#[test]` functions and `#[cfg(test)]` modules.
 
     Returns:
         A markdown inventory with file:line references. It is evidence, not a verdict.

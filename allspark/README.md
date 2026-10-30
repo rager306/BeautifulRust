@@ -30,7 +30,7 @@ updates it from the fork.
 End-to-end, with `ALLSPARK_HOME=/root/.allspark-home`, a new session built the package
 into the kernel venv and `await rust_review("lints/check/src")` returned the inventory.
 The same run showed why the home must be pinned: the nested home had an empty `auth.json`,
-and the provider rejected the request with HTTP 400. The current package is `0.2.0`; on
+and the provider rejected the request with HTTP 400. The current package is `0.2.1`; on
 `kutha-graph` it reports 1 production `unwrap` and 18 `expect`, versus 45 and 24 when
 inline tests are included.
 
