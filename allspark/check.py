@@ -399,7 +399,15 @@ def _check_upstream_metadata(root: Path, problems: List[Problem]) -> None:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
-        if not (shallow.returncode == 0 and shallow.stdout.strip() == "true"):
+        merge_head = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"],
+            cwd=str(root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        shallow_repo = shallow.returncode == 0 and shallow.stdout.strip() == "true"
+        merging = merge_head.returncode == 0
+        if not shallow_repo and not merging:
             result = subprocess.run(
                 ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
                 cwd=str(root),
