@@ -70,7 +70,7 @@ Update, or pin a release tag:
 
 ```bash
 allspark package update
-allspark package install https://github.com/rager306/BeautifulRust#allspark-v1.4.0-fork.001
+allspark package install https://github.com/rager306/BeautifulRust#allspark-v1.5.0-fork.001
 ```
 
 Remove:
