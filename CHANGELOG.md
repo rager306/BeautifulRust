@@ -8,6 +8,23 @@ All notable changes to this project are listed here. Versions follow
 
 ### Added
 
+- **A Codex and ChatGPT plugin.** A portable `plugin.json` at the repo root, with the
+  `extensions.com.openai` listing details, packages the three skills for Codex and the
+  ChatGPT / Codex Plugins Directory. `.agents/plugins/marketplace.json` lets Codex install
+  it with `codex plugin add beautiful-rust@beautiful-rust`.
+  `scripts/package-openai-plugin.py` builds the directory upload without the eval cases,
+  and `scripts/check-skill.py` now checks the manifest against OpenAI's field limits and
+  keeps its version in step with the Claude Code manifest. `PRIVACY.md` states that the
+  skills collect nothing. Requested by @Castor6 in #7.
+
+## [1.5.0] - 2026-10-30
+
+Bevy support, a Claude Code vs Codex benchmark, and every Rust example compiled in CI.
+Thanks to @tmchow and @DylanCosto for their pull requests, and to @millionart for
+proposing Bevy support.
+
+### Added
+
 - **Bevy support.** `skills/rust-best-practices/references/bevy.md` covers Bevy 0.20.
   It says which general rules don't apply to systems: by-value system parameters, the
   Bevy prelude, public fields on plain-data components, and complex query types. It
@@ -31,11 +48,24 @@ All notable changes to this project are listed here. Versions follow
   `cargo check`, and reports errors at the markdown line. `scripts/examples.json` holds
   the surrounding code that fragments need to compile, or the reason a block is
   skipped. CI runs it on every push and pull request. Contributed by @tmchow in #4.
+- **Two more lints in `lints/lints.toml`.** `clippy::missing_assert_message` flags an
+  `assert!` with no message, the checklist rule from the Google Rust Style Guide's "Use
+  context strings to clarify assertions"; it stays quiet inside `#[test]` functions.
+  `clippy::exhaustive_enums` (`[lib]`) flags an exported enum without
+  `#[non_exhaustive]`, the lint the same guide names for that rule; binary crates
+  export nothing, so it never fires there. `lints/check/` proves both fire.
+  Contributed by @tmchow in #8.
 
 ### Changed
 
 - The glob-import rule in both skills allows a framework's documented prelude, such as
   `use bevy::prelude::*`. Clippy's `wildcard_imports` already exempts these.
+- Both skills now cover `impl Into<T>` parameters and collected return values, from the
+  Google Rust Style Guide's "Accepting Into" and "Iterators vs. owned collections in
+  return types". Application code takes `String` or `&str` rather than
+  `impl Into<String>`, and library code returns an iterator instead of collecting into
+  a `Vec`. `rust-review` flags both, with Google's exceptions for owned results.
+  Contributed by @tmchow in #9.
 
 ### Fixed
 
@@ -145,7 +175,8 @@ First release.
 - Packaged as a Claude Code plugin that is its own marketplace.
 - MIT license, source attribution, and a plugin icon.
 
-[Unreleased]: https://github.com/morganlinton/BeautifulRust/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/morganlinton/BeautifulRust/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/morganlinton/BeautifulRust/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/morganlinton/BeautifulRust/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/morganlinton/BeautifulRust/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/morganlinton/BeautifulRust/compare/v1.1.0...v1.2.0

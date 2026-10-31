@@ -5,3 +5,4 @@ lints/check/Cargo.lock
 # allspark:python-caches
 __pycache__/
 *.pyc
+dist/
