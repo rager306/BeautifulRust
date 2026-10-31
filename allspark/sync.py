@@ -19,6 +19,7 @@ Exit codes for sync:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -69,6 +70,20 @@ def configure_remotes() -> None:
     push_url = output("remote", "get-url", "--push", UPSTREAM_REMOTE)
     if push_url and push_url != "no_push":
         print("warning: pushing to upstream is enabled; the sync script never does it")
+
+
+def overlay_paths() -> set:
+    path = ROOT / "allspark" / "overlays.py"
+    spec = importlib.util.spec_from_file_location("allspark_overlays", path)
+    if spec is None or spec.loader is None:
+        return set()
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        return set()
+    return {overlay["path"] for overlay in module.OVERLAYS}
 
 
 def plugin_version() -> str:
@@ -249,12 +264,28 @@ def sync(apply: bool, full: bool, branch: Optional[str], tag: bool, push: bool) 
     print("merging %s..." % UPSTREAM_REMOTE + "/main")
     merge = git("merge", "--no-commit", "--no-ff", "upstream/main", capture=False)
     if merge.returncode != 0:
-        conflicts = output("diff", "--name-only", "--diff-filter=U")
-        git("merge", "--abort")
-        print("merge conflict; aborted. Resolve these paths by hand:")
-        for path in conflicts.splitlines():
-            print("  " + path)
-        return 2
+        conflicts = [
+            path
+            for path in output("diff", "--name-only", "--diff-filter=U").splitlines()
+            if path
+        ]
+        protected = overlay_paths()
+        unresolved = [path for path in conflicts if path not in protected]
+        if conflicts and not unresolved:
+            print("resolving overlay conflicts from upstream + overlay: %s" % ", ".join(conflicts))
+            for path in conflicts:
+                checkout = git("checkout", "--theirs", "--", path)
+                if checkout.returncode != 0:
+                    git("merge", "--abort")
+                    print("could not take the upstream version of %s" % path)
+                    return 2
+                git("add", path)
+        else:
+            git("merge", "--abort")
+            print("merge conflict; aborted. Resolve these paths by hand:")
+            for path in conflicts:
+                print("  " + path)
+            return 2
 
     print("applying fork overlays...")
     overlay = subprocess.run(
