@@ -249,15 +249,29 @@ upstream release.
 creates `allspark/sync` and opens a pull request instead of pushing to `main`; a green PR
 is the review gate. The workflow serializes runs with a concurrency group, has a 30-minute
 timeout, caches the Cargo registry, writes the PR body from the actual diff, and opens or
-comments on an issue when a run fails. Merge the PR with a merge commit, not a squash: the
-fork tag points at the branch commit. If a sync PR is rejected, delete its
-`allspark-v*-fork.*` tag; it was created on the branch before review. GitHub disables
-workflows on forks by default, so enable Actions in the fork's settings once.
+comments on an issue when a run fails. Merge the PR with a merge commit, not a squash,
+to preserve upstream history. The workflow does not create a tag before review. After
+merging, fetch `origin/main` and the tags, then create and push an annotated
+`allspark-v<VERSION>-fork.<NNN>` tag on the reviewed merge commit, using the version in
+`.claude-plugin/plugin.json` and the next unused number for that version. Verify the
+commit and tag name before pushing. GitHub disables workflows on forks by default, so
+enable Actions in the fork's settings once.
 
-The workflow uses `github.token` by default. If the repo does not allow Actions to create
-pull requests (Settings > Actions > General), add a fine-grained `ALLSPARK_SYNC_TOKEN`
-secret with `contents: write`, `pull-requests: write`, and `issues: write`; otherwise the
-branch is still pushed and the job prints a compare link instead of failing.
+For automatic sync, create a fine-grained PAT restricted to this fork with repository
+permissions `contents: write`, `workflows: write`, `pull requests: write`, and
+`issues: write`, and save it as the `ALLSPARK_SYNC_TOKEN` Actions secret. The checkout
+uses this token for git pushes, including changes to workflow files; the GitHub CLI
+uses it for pull requests and failure issues. The token owner must have access to the
+fork. Rotate the token before it expires.
+
+The workflow fails early if the secret is missing. The built-in `github.token` cannot
+push changes to workflow files. If PR creation fails after a successful push, the job
+fails and prints a compare link. Failures are also recorded in the run summary and
+annotated in the Actions log.
+
+Failure reporting by issue requires Issues to be enabled in Settings > General > Features.
+If the workflow cannot find, create, or comment on an issue, the run logs a warning;
+also monitor failed Actions runs directly.
 
 ## Python skill tests
 
