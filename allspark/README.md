@@ -248,7 +248,7 @@ upstream release.
 `.github/workflows/allspark-sync.yml` runs the same sync script daily and on demand. It
 creates `allspark/sync` and opens a pull request instead of pushing to `main`; a green PR
 is the review gate. The workflow serializes runs with a concurrency group, has a 30-minute
-timeout, caches the Cargo registry, writes the PR body from the actual diff, and opens or
+timeout, writes the PR body from the actual diff, and opens or
 comments on an issue when a run fails. Merge the PR with a merge commit, not a squash,
 to preserve upstream history. The workflow does not create a tag before review. After
 merging, fetch `origin/main` and the tags, then create and push an annotated

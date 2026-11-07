@@ -44,14 +44,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('lints/check/Cargo.toml', 'scripts/examples.json') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - name: Configure git
         run: |
           git config user.name "allspark sync"
