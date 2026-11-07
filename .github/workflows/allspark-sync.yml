@@ -36,6 +36,7 @@ jobs:
           fi
       - uses: actions/checkout@v7
         with:
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.ALLSPARK_SYNC_TOKEN }}
       - uses: actions/setup-python@v7
@@ -48,20 +49,48 @@ jobs:
         run: |
           git config user.name "allspark sync"
           git config user.email "allspark-sync@users.noreply.github.com"
+      - name: Resume an unmerged sync branch
+        run: |
+          git fetch origin --prune
+          git merge --ff-only origin/main
+          if git rev-parse --verify --quiet refs/remotes/origin/allspark/sync >/dev/null; then
+            if git merge-base --is-ancestor origin/allspark/sync origin/main; then
+              echo "The previous sync branch is already merged into main."
+            else
+              result=$?
+              if [ "$result" -ne 1 ]; then
+                exit "$result"
+              fi
+              git switch --track -c allspark/sync origin/allspark/sync
+            fi
+          else
+            result=$?
+            if [ "$result" -ne 1 ]; then
+              exit "$result"
+            fi
+            echo "No previous sync branch exists."
+          fi
       - name: Show upstream position
         run: python3 allspark/sync.py status --fetch
       - name: Merge, validate, and push the sync branch
         run: python3 allspark/sync.py sync --apply --full --branch allspark/sync --push
       - name: Build the pull request summary
         run: |
-          if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
+          set -o pipefail
+          if git show-ref --verify --quiet refs/heads/allspark/sync; then
+            :
+          else
+            result=$?
+            if [ "$result" -ne 1 ]; then
+              exit "$result"
+            fi
             echo "upstream was already current" > "$RUNNER_TEMP/pr-body.md"
             exit 0
           fi
           {
             echo "Automated sync from morganlinton/BeautifulRust."
             echo
-            echo "## Upstream commits"
+            echo "## Commits on the sync branch"
             echo
             echo '```'
             git log --oneline --no-decorate origin/main..allspark/sync
@@ -75,7 +104,7 @@ jobs:
             echo
             echo "## Skills"
             echo
-            git diff --name-only origin/main...allspark/sync -- 'skills/*/SKILL.md' | sed 's/^/- /' || true
+            git diff --name-only origin/main...allspark/sync -- 'skills/*/SKILL.md' | sed 's/^/- /'
             echo
             echo "## Recorded upstream"
             echo
@@ -83,7 +112,7 @@ jobs:
             cat allspark/upstream.json
             echo '```'
             echo
-            echo "All checks passed: upstream validator, allspark compatibility, unit tests, examples, and lints."
+            echo "New upstream merges run the upstream validator, allspark compatibility checks, unit tests, examples, and lints before being pushed."
             echo
             echo "Merge with a merge commit, not squash, to preserve upstream history. Tag the merged commit after review; see allspark/README.md."
           } > "$RUNNER_TEMP/pr-body.md"
@@ -92,26 +121,30 @@ jobs:
           GH_TOKEN: ${{ secrets.ALLSPARK_SYNC_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if ! git rev-parse --verify --quiet refs/heads/allspark/sync >/dev/null; then
+          if git show-ref --verify --quiet refs/heads/allspark/sync; then
+            :
+          else
+            result=$?
+            if [ "$result" -ne 1 ]; then
+              exit "$result"
+            fi
             echo "no sync branch was created; upstream was already current"
             exit 0
           fi
-          if [ -z "$(git log origin/main..allspark/sync --oneline)" ]; then
+          ahead=$(git rev-list --count origin/main..allspark/sync)
+          if [ "$ahead" -eq 0 ]; then
             echo "sync branch has no commits ahead of main"
             exit 0
           fi
-          if gh pr view allspark/sync --json number >/dev/null 2>&1; then
-            gh pr edit allspark/sync --body-file "$RUNNER_TEMP/pr-body.md" \
-              || echo "::notice::Could not update the pull request body."
-            gh pr comment allspark/sync --body "Rebuilt from the latest upstream main." \
-              || echo "::notice::Could not comment on the pull request."
-          elif ! gh pr create \
+          number=$(gh pr list --state open --base main --head allspark/sync --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --body-file "$RUNNER_TEMP/pr-body.md"
+          else
+            gh pr create \
               --base main \
               --head allspark/sync \
               --title "allspark: sync upstream" \
-              --body-file "$RUNNER_TEMP/pr-body.md"; then
-            echo "::error::Could not create a pull request. Open one: ${{ github.server_url }}/${{ github.repository }}/compare/main...allspark/sync?expand=1"
-            exit 1
+              --body-file "$RUNNER_TEMP/pr-body.md"
           fi
       - name: Report a failed sync
         if: failure()
