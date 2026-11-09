@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "beautiful-rust",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Write, review, port, and enforce idiomatic Rust: three skills distilled from the Google Rust Style Guide, the Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft's Pragmatic Rust Guidelines, plus a drop-in clippy config.",
   "author": {
     "name": "Morgan Linton",
@@ -26,13 +26,16 @@
       "interface": {
         "displayName": "Beautiful Rust",
         "shortDescription": "Write, review, and port Rust",
-        "longDescription": "Three skills for Rust developers, distilled from the Google Rust Style Guide, the Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft's Pragmatic Rust Guidelines.\n\nrust-best-practices guides new Rust code: error handling, API design, ownership, traits, async, unsafe and FFI, tests, and docs. It includes guidance for the Bevy game engine.\n\nrust-review reviews a file, crate, or diff and returns a prioritized report. Every finding cites a file and line, the rule it breaks, and the smallest fix.\n\nrust-port ports C, C++, Python, Go, JavaScript, or TypeScript to idiomatic Rust with the same behavior. It ports the original tests first and writes a PORTING.md that lists every deliberate difference.\n\nThe skills contain instructions and reference text only. They make no network calls and collect no data. When a Rust toolchain is available, the skills run cargo fmt, cargo clippy, and cargo test on your project; without one, they work from the code alone. A drop-in clippy config is available in the GitHub repository.",
+        "longDescription": "Three skills for Rust developers, distilled from the Google Rust Style Guide, the Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft's Pragmatic Rust Guidelines.\n\nrust-best-practices guides new Rust code: error handling, API design, ownership, traits, async, unsafe and FFI, tests, and docs. It includes guidance for the Bevy game engine.\n\nrust-review reviews a file, crate, or diff and returns a prioritized report. Findings cite a file and line, the rule involved, and a suggested fix.\n\nrust-port ports C, C++, Python, Go, JavaScript, or TypeScript to idiomatic Rust with the same behavior. It asks for the original tests to be ported first and writes a PORTING.md listing deliberate differences.\n\nThe plugin also connects to the Beautiful Rust MCP server, a read-only service with three tools. search_guidance quotes the matching rules word for word, with links and their source guide. explain_lint explains any rustc or clippy lint and how Beautiful Rust's clippy config sets it. get_crate_versions reads crates.io for a crate's newest version, minimum Rust version, and features, so suggested versions can be checked against what's actually published. The server needs no account, receives only each tool's input, and keeps nothing after answering.\n\nWhen a Rust toolchain is available, the skills run cargo fmt, cargo clippy, and cargo test on your project; without one, they work from the code and the server's lookups. A drop-in clippy config is available in the GitHub repository.",
         "developerName": "Morgan Linton",
         "category": "Developer Tools",
         "capabilities": [
           "Write idiomatic Rust",
           "Review Rust code with cited rules",
-          "Port code to Rust with the same behavior"
+          "Port code to Rust with the same behavior",
+          "Quote Rust rules with their sources",
+          "Explain clippy lints",
+          "Look up current crate versions"
         ],
         "websiteURL": "https://github.com/morganlinton/BeautifulRust",
         "supportURL": "https://github.com/morganlinton/BeautifulRust/issues",
@@ -48,7 +51,57 @@
         "logo": "./assets/icon.png"
       },
       "publication": {
-        "release_notes": "Bevy support, a Claude Code vs Codex benchmark, and every Rust example compiled in CI."
+        "release_notes": "Adds the Beautiful Rust MCP server: rule search, clippy lint explanations, and current crate versions from crates.io."
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Newest crate version and its minimum Rust version",
+              "prompt": "What's the latest version of serde, and what Rust version does it need?",
+              "tools_triggered": "get_crate_versions",
+              "expected_behavior": "Names serde's newest non-yanked version from the crates.io index and its minimum Rust version, or says the crate does not declare one."
+            },
+            {
+              "description": "Explain a clippy lint and the plugin's setting",
+              "prompt": "What does clippy's unwrap_used lint catch, and does Beautiful Rust turn it on?",
+              "tools_triggered": "explain_lint",
+              "expected_behavior": "Explains that unwrap_used flags calls to unwrap on Option and Result, says Beautiful Rust's lints.toml sets it to warn, and gives the suggested fix: use ? or expect with a reason."
+            },
+            {
+              "description": "Quote a rule with its source",
+              "prompt": "What does Beautiful Rust say about bool parameters?",
+              "tools_triggered": "search_guidance",
+              "expected_behavior": "Quotes the rule to replace bool parameters with an enum or two methods, links the section it comes from, and names the source style guide."
+            },
+            {
+              "description": "Check a crate exists before suggesting it",
+              "prompt": "Is there a crate called serde_jsonn on crates.io?",
+              "tools_triggered": "get_crate_versions",
+              "expected_behavior": "Reports that no crate with that name exists on crates.io instead of inventing a version."
+            },
+            {
+              "description": "Find guidance for an error-handling question",
+              "prompt": "Should my Rust library return anyhow::Error or define its own error type?",
+              "tools_triggered": "search_guidance",
+              "expected_behavior": "Returns the error-handling sections that recommend a dedicated error type, such as one built with thiserror, for libraries and anyhow for applications, with links to each section."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Not Rust",
+              "prompt": "Write a Python script that renames files in a folder."
+            },
+            {
+              "description": "Write action the tools cannot take",
+              "prompt": "Publish my crate to crates.io."
+            },
+            {
+              "description": "Unrelated topic",
+              "prompt": "What's the weather in Los Angeles?"
+            }
+          ]
+        }
       }
     }
   }
